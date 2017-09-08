@@ -6,5 +6,5 @@ APP_STL := gnustl_static
 APP_ABI := armeabi-v7a
 
 # Min SDK level
-APP_PLATFORM=android-23
+APP_PLATFORM=android-21
 APP_CPPFLAGS := -std=c++11 -fexceptions -Wall -Wformat

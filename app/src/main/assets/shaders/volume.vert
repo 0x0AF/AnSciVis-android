@@ -1,7 +1,5 @@
 #version 300 es
 precision mediump float;
-//#extension GL_ARB_shading_language_420pack : require
-//#extension GL_ARB_explicit_attrib_location : require
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec2 texCoord;

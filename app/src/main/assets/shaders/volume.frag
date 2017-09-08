@@ -2,8 +2,6 @@
 precision mediump float;
 precision mediump sampler2D;
 precision mediump sampler3D;
-//#extension GL_ARB_shading_language_420pack : require
-//#extension GL_ARB_explicit_attrib_location : require
 
 #define TASK 10
 #define ENABLE_OPACITY_CORRECTION 0
@@ -44,11 +42,8 @@ vec3 get_gradient(vec3 pos)
     vec3 dx, dy, dz;
 
     dx = vec3(0.0001, 0.0, 0.0);
-//    dx = vec3(max_bounds.x / volume_dimensions.x, 0.0, 0.0);
     dy = vec3(0.0, 0.0001, 0.0);
-//    dy = vec3(0.0, max_bounds.y / volume_dimensions.y, 0.0);
     dz = vec3(0.0, 0.0, 0.0001);
-//    dz = vec3(0.0, 0.0, max_bounds.z / volume_dimensions.z);
 
     float x_r = get_sample_data(pos + dx);
     float x_l = get_sample_data(pos - dx);
@@ -62,15 +57,9 @@ vec3 get_gradient(vec3 pos)
 
 void main()
 {
-    /// One step trough the volume
     vec3 ray_increment = normalize(ray_entry_position - camera_location) * sampling_distance;
-    /// Position in Volume
-    vec3 sampling_pos = ray_entry_position + ray_increment; // test, increment just to be sure we are in the volume
-
-    /// Init color of fragment
+    vec3 sampling_pos = ray_entry_position + ray_increment;
     vec4 dst = vec4(0.0, 0.0, 0.0, 0.0);
-
-    /// check if we are inside volume
     bool inside_volume = inside_volume_bounds(sampling_pos);
 
     if(!inside_volume)
@@ -79,27 +68,16 @@ void main()
 #if TASK == 10
     vec4 max_val = vec4(0.0, 0.0, 0.0, 0.0);
 
-    // the traversal loop,
-    // termination when the sampling position is outside volume boundarys
-    // another termination condition for early ray termination is added
     while(inside_volume)
     {
-        // get sample
         float s = get_sample_data(sampling_pos);
-
-        // apply the transfer functions to retrieve color and opacity
         vec4 color = texture(transfer_texture, vec2(s, s));
-
-        // this is the example for maximum intensity projection
         max_val.r = max(color.r, max_val.r);
         max_val.g = max(color.g, max_val.g);
         max_val.b = max(color.b, max_val.b);
         max_val.a = max(color.a, max_val.a);
-
-        // increment the ray sampling position
         sampling_pos += ray_increment;
 
-        // update the loop termination condition
         inside_volume = inside_volume_bounds(sampling_pos);
     }
 
@@ -110,12 +88,8 @@ void main()
     vec4 average_val = vec4(0.0, 0.0, 0.0, 0.0);
     float i = 0.0;
 
-    // the traversal loop,
-    // termination when the sampling position is outside volume boundarys
-    // another termination condition for early ray termination is added
     while(inside_volume)
     {
-        // get sample
         float s = get_sample_data(sampling_pos);
 
         vec4 color = texture(transfer_texture, vec2(s, s));
@@ -137,10 +111,8 @@ void main()
             average_val.a = color.a;
         }
 
-        // increment the ray sampling position
         sampling_pos += ray_increment;
 
-        // update the loop termination condition
         inside_volume = inside_volume_bounds(sampling_pos);
     }
 
@@ -149,22 +121,18 @@ void main()
 #endif
 
 #if TASK == 12 || TASK == 13
-    // the traversal loop,
-    // termination when the sampling position is outside volume boundarys
-    // another termination condition for early ray termination is added
     while(inside_volume)
     {
-        // get sample
         float s = get_sample_data(sampling_pos);
 
         if(s > iso_value)
         {
-#if TASK == 13 // Binary Search
+#if TASK == 13
 
             vec3 hit_pos = sampling_pos;
             sampling_pos = sampling_pos - ray_increment;
 
-            float epsilon = 0.001;
+            float epsilon = 0.000001;
 
             while(length(hit_pos - ray_entry_position) - length(sampling_pos - ray_entry_position) > epsilon)
             {
@@ -183,7 +151,7 @@ void main()
 
             dst = texture(transfer_texture, vec2(s, s));
 
-#if ENABLE_LIGHTNING == 1 // Add Shading
+#if ENABLE_LIGHTNING == 1
 
             vec3 normal = normalize(-get_gradient(sampling_pos));
             vec3 lightDir = normalize(light_position - sampling_pos);
@@ -201,9 +169,8 @@ void main()
 
             vec3 colorLinear = light_ambient_color + lambertian * dst.xyz * light_diffuse_color + specular * light_specular_color;
             dst = vec4(colorLinear, dst.a);
-//            dst = vec4(normal, dst.a);
 
-#if ENABLE_SHADOWING == 1 // Add Shadows
+#if ENABLE_SHADOWING == 1
 
             vec3 shadow_ray_increment = normalize(light_position - sampling_pos) * sampling_distance;
             vec3 shadow_sampling_pos = sampling_pos + shadow_ray_increment;
@@ -228,30 +195,23 @@ void main()
             break;
         }
 
-        // increment the ray sampling position
         sampling_pos += ray_increment;
 
-        // update the loop termination condition
         inside_volume = inside_volume_bounds(sampling_pos);
     }
 #endif
 
 #if TASK == 31
-    // the traversal loop,
-    // termination when the sampling position is outside volume boundarys
-    // another termination condition for early ray termination is added
     vec3 comp_color = vec3(0, 0, 0);
     float comp_transp = 1.0;
     float i = 0.0;
 
     while(inside_volume)
     {
-        // get sample
-
         float s = get_sample_data(sampling_pos);
         vec4 color = texture(transfer_texture, vec2(s, s));
 
-#if ENABLE_LIGHTNING == 1 // Add Shading
+#if ENABLE_LIGHTNING == 1
         vec3 normal = normalize(-get_gradient(sampling_pos));
         vec3 lightDir = normalize(light_position - sampling_pos);
 
@@ -269,22 +229,6 @@ void main()
         color = vec4(light_ambient_color + lambertian * color.xyz * light_diffuse_color + specular * light_specular_color, color.a);
 #endif
 
-        // back to front
-        //    if (i != 0) {
-        //      i++;
-        //      comp_color.r = comp_color.r * (1 - comp_transp) + color.a * color.r;
-        //      comp_color.g = comp_color.g * (1 - comp_transp) + color.a * color.g;
-        //      comp_color.b = comp_color.b * (1 - comp_transp) + color.a * color.b;
-        //      comp_transp = (1 - color.a) * comp_transp;
-        //    } else {
-        //      i++;
-        //      comp_color.r = color.r * color.a;
-        //      comp_color.g = color.g * color.a;
-        //      comp_color.b = color.b * color.a;
-        //      comp_transp = 1 - color.a;
-        //    }
-
-        // front to back
         if(i != 0.0)
         {
             i++;
@@ -302,27 +246,25 @@ void main()
             comp_transp = 1.0 - color.a;
         }
 
-        // increment the ray sampling position
         sampling_pos += ray_increment;
 
         if(comp_transp < 0.0)
             break;
 
-        // update the loop termination condition
         inside_volume = inside_volume_bounds(sampling_pos);
     }
 
-#if ENABLE_OPACITY_CORRECTION == 1 // Opacity Correction
+#if ENABLE_OPACITY_CORRECTION == 1
     comp_transp = pow(comp_transp, sampling_distance_ref / sampling_distance);
 #endif
 
     dst = vec4(comp_color, 1.0 - comp_transp);
 #endif
 
-    if(dst.a < 0.1){
+    if(dst.a < 0.01)
+    {
         discard;
     }
 
-    // return the calculated color value
     FragColor = dst;
 }
